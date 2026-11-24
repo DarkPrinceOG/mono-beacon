@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">MONO // BEACON</string>
+    <string name="action_rings_now">RING NOW</string>
+    <string name="settings">Settings</string>
+    <string name="home">Home</string>
+    <string name="listening_mode">Listening Mode</string>
+    <string name="scheduled_window">Scheduled Window</string>
+    <string name="always_active">24/7 Always Active</string>
+    <string name="paused">Paused</string>
+    <string name="custom_keyword">Custom Secret SMS Keyword</string>
+    <string name="ring_now">RING NOW</string>
+    <string name="beacon_on">BEACON ON</string>
+    <string name="beacon_24_7">BEACON 24/7</string>
+    <string name="beacon_window">BEACON WINDOW</string>
+    <string name="beacon_off">BEACON OFF</string>
+    <string name="alarm_duration">Alarm Duration</string>
+    <string name="led_strobe">LED Strobe</string>
+    <string name="stop_alarm">STOP ALARM</string>
+    <string name="force_24_7_mode">Force 24/7 Mode</string>
+    <string name="update_listening_hours">Update Listening Hours</string>
+    <string name="activate_listening_now">Activate Listening Now</string>
+    <string name="current_window">Current Window</string>
+    <string name="sms_confirmation">SMS Command Received</string>
+    <string name="confirmation_sent">Confirmation sent</string>
+    <string name="firebase_status">Firebase Status</string>
+    <string name="online">Online</string>
+    <string name="offline">Offline</string>
+    <string name="no_restrictions">No restrictions</string>
+    <string name="autostart_settings">Autostart Settings</string>
+    <string name="battery_saver">Battery Saver</string>
+    <string name="sms_trigger_received">SMS Trigger Received</string>
+</STRINGSEOF

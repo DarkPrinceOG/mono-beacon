@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <mipmap-format android:value="png"/>
+    <background-color android:value="#000000"/>
+    <androidx.core.graphics.drawable.AdaptiveIconDrawable
+        android:background="#0D0D0D"
+        android:foreground="@mipmap/ic_launcher_foreground"/>
+</adaptive-icon>
