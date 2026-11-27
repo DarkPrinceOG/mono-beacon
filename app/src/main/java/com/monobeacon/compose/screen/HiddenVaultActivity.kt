@@ -1,5 +1,7 @@
 package com.monobeacon.compose.screen
 
+import com.monobeacon.monobeacon.R
+
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent

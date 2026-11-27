@@ -1,5 +1,7 @@
 package com.monobeacon.compose.screen
 
+import com.monobeacon.monobeacon.R
+
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.material3.MaterialTheme
