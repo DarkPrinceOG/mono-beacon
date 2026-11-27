@@ -15,11 +15,10 @@ import com.monobeacon.theme.MonobeaconTheme
 fun SystemDiagnosticsScreen(
     onReturnHome: () -> Unit
 ) {
-    // Static decoy values - doesn't actually read system properties
+    // Static decoy values - doesn't actually read system properties (guarded for offline play)
     val batteryHealth = "GOOD"
     val radioState = "IDLE"
     val wakeLocks = "0"
-    val chargeCycles = "847"
 
     Column(
         modifier = Modifier.fillMaxSize().padding(16.dp),
@@ -55,7 +54,7 @@ fun SystemDiagnosticsScreen(
                     textAlign = TextAlign.Center
                 )
                 Text(
-                    text = "CHARGE CYCLES: $chargeCycles",
+                    text = "CHARGE CYCLES: 847",
                     style = MaterialTheme.typography.caption,
                     color = Color.LightGray,
                     textAlign = TextAlign.Center
@@ -112,34 +111,6 @@ fun SystemDiagnosticsScreen(
                 )
                 Text(
                     text = "PARTIAL_WAKE_LOCK: false",
-                    style = MaterialTheme.typography.caption,
-                    color = Color.LightGray,
-                    textAlign = TextAlign.Center
-                )
-            }
-        }
-
-        // Uptime card
-        Box(
-            modifier = Modifier
-                .width(200.dp)
-                .height(80.dp)
-                .background(backgroundColor = Color.OffBlack)
-                .padding(vertical = 8.dp)
-        ) {
-            Column(
-                modifier = Modifier.fillMaxSize(),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
-            ) {
-                Text(
-                    text = "UPTIME: 3 days 14h ago",
-                    style = MaterialTheme.typography.body1,
-                    color = Color.White,
-                    textAlign = TextAlign.Center
-                )
-                Text(
-                    text = "BOOT_TIME: Simulated",
                     style = MaterialTheme.typography.caption,
                     color = Color.LightGray,
                     textAlign = TextAlign.Center

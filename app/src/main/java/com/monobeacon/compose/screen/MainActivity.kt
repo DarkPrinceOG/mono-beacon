@@ -13,28 +13,17 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkMode
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.verticalLayout
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.thresholdScroll
+import androidx.compose.foundation.pointer.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.disposeOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
+import androidx.compose.ui.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.Unit
-import androidx.compose.ui.layout.ContentAnchor
-import androidx.compose.ui.layout.MeasurePolicy
-import androidx.compose.ui.layout.Arrangement
-import androidx.compose.ui.layout.placeInRow
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.platform.viewRootLayerOf
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.textUnit
 import androidx.compose.ui.util.animateDpAsState
@@ -42,6 +31,9 @@ import androidx.compose.ui.viewinterceptor.WindowInsets
 import androidx.compose.ui.viewinterceptor.getWindowInsets
 import androidx.compose.runtime.saveState
 import androidx.compose.runtime.saveMutableState
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.lifecycleScope
 import com.monobeacon.data.DataStoreManager
 import com.monobeacon.data.PreferencesSchema
 import com.monobeacon.theme.MonobeaconTheme
@@ -67,17 +59,19 @@ class MainActivity : ComponentActivity() {
     private val DECOY_PIN = "0000"
 
     // Lifecycle observer for auto-lock
-    private lateinit var lifecycleObserver: androidx.lifecycle.LifecycleEventObserver
+    private lateinit var lifecycleObserver: LifecycleEventObserver
+
+    // Power connection receiver for vault battery monitor
+    private lateinit var powerReceiver: BroadcastReceiver
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         // Set up lifecycle observer for auto-lock
-        lifecycleObserver = object : androidx.lifecycle.LifecycleEventObserver {
-            override fun onStateChanged(scope: androidx.lifecycle.LifecycleOwner, state: androidx.lifecycle.Lifecycle.State) {
+        lifecycleObserver = object : LifecycleEventObserver {
+            override fun onStateChanged(owner: LifecycleOwner, state: Lifecycle.State) {
                 when (state) {
-                    androidx.lifecycle.Lifecycle.State.ON_PAUSE,
-                    androidx.lifecycle.Lifecycle.State.STOP -> {
+                    Lifecycle.State.ON_PAUSE, Lifecycle.State.STOP -> {
                         // Auto-lock vault when app minimized/screen locked
                         isVaultUnlocked = false
                         tapCount = 0
@@ -90,15 +84,15 @@ class MainActivity : ComponentActivity() {
         lifecycle.addObserver(lifecycleObserver)
 
         // Register power connection receiver for vault battery monitor
-        val powerReceiver = object : BroadcastReceiver() {
+        powerReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
                 val action = intent.action
                 when (action) {
                     android.intent.action.ACTION_POWER_CONNECTED -> {
-                        // Battery charging started - could update UI
+                        // Battery charging started
                     }
                     android.intent.action.ACTION_POWER_DISCONNECTED -> {
-                        // Battery discharging - could update UI
+                        // Battery discharging
                     }
                 }
             }
@@ -127,7 +121,6 @@ class MainActivity : ComponentActivity() {
         setContent {
             MonobeaconTheme {
                 AppScaffold(
-                    onVaultToggle = { /* handled internally */ },
                     selectedDestination = remember { mutableStateOf(Destination.HOME) },
                     onDestinationSelected = { destination ->
                         selectedDestination.value = destination
@@ -137,14 +130,21 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    /**
+    /***
+     * Enum for app destinations
+     */
+    enum class Destination {
+        HOME, SETTINGS, VAULT, GAMES
+    }
+
+    /***
      * Tap gesture detector for the header title PIN gate
      * Tapping the top header title 5 times within 2 seconds opens the vault
      */
     @Composable
     fun HeaderWithPINGate(
         modifier: Modifier = Modifier,
-        titleText: String = "MONO // BEACON",
+        titleText: String = "Beacon",
         onVaultRequested: () -> Unit
     ) {
         var tapConsumed by remember { mutableStateOf(false) }
@@ -155,15 +155,12 @@ class MainActivity : ComponentActivity() {
                 .fillMaxWidth()
                 .height(56.dp)
                 .background(backgroundColor = MonobeaconTheme.composableColorScheme.surface)
-                .pointerInteropReceiver { insets ->
-                    // Forward insets
-                }
         ) {
             // Tap-sensitive title area
             val clickableModifier = Modifier
                 .pointerInput(Unit) {  // Recompose on pointer events
                     awaitPointerEvent { event ->
-                        if (event.action == pointerInputEvent ACTION_DOWN) {
+                        if (event.action == MotionEvent.ACTION_DOWN) {
                             val now = System.currentTimeMillis()
                             if (firstTapTime == 0) {
                                 firstTapTime = now
@@ -213,13 +210,10 @@ class MainActivity : ComponentActivity() {
     ) {
         var pinEntered by remember { mutableStateOf("") }
 
-        // Shake animation for wrong attempts
-        var wrongAttempts by remember { mutableStateOf(0) }
-
         Column(
             modifier = Modifier.fillMaxSize().padding(16.dp),
             verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontantly
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // Title
             Text(
@@ -238,112 +232,75 @@ class MainActivity : ComponentActivity() {
                 modifier = Modifier.padding(bottom = 32.dp)
             )
 
-            // PIN entry grid
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                val pinChars = pinEntered.toCharArray()
-                val maxLen = 4
+            // PIN entry grid - 4x4 grid with numbers and DEL/ENT
+            val rows = intArrayOf(
+                intArrayOf('1', '2', '3'),
+                intArrayOf('4', '5', '6'),
+                intArrayOf('7', '8', '9'),
+                intArrayOf('DEL', '0', 'ENT')
+            )
 
-                // Number pad rows
-                val rows = intArrayOf(
-                    intArrayOf('1', '2', '3'),
-                    intArrayOf('4', '5', '6'),
-                    intArrayOf('7', '8', '9'),
-                    intArrayOf('DEL', '0', 'ENT')
-                )
+            for ((rowIndex, row) in rows.withIndex()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Fill,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    for ((colIndex, char) in row.withIndex()) {
+                        val isEmpty = char == 'DEL'
+                        val isEnter = char == 'ENT'
 
-                for ((rowIndex, row) in rows.withIndex()) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(weight = 1f),
-                        horizontalArrangement = Arrangement.Fill,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        for ((colIndex, char) in row.withIndex()) {
-                            val isEmpty = char == 'DEL'
-                            val isEnter = char == 'ENT'
+                        val buttonLabel = when {
+                            isEnter → "✓"
+                            isEmpty → "⌫"
+                            else → char.toString()
+                        }
 
-                            val buttonLabel = when {
-                                isEnter → "✓"
-                                isEmpty → "⌫"
-                                else → char.toString()
-                            }
-
-                            Button(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .size(width = 60.dp, height = 48.dp),
-                                onClick = {
-                                    if (isEnter) {
-                                        // Validate PIN
-                                        when (pinEntered) {
-                                            "0000" -> onDecoySelected()  // Decoy path
-                                            else -> {
-                                                // Check if real PIN (we'll accept any 4-digit for now)
-                                                // In production, compare against stored hash
-                                                if (pinEntered.length == 4) {
-                                                    onPinEntered(pinEntered)
-                                                }
+                        Button(
+                            modifier = Modifier
+                                .weight(1f)
+                                .size(width = 56.dp, height = 44.dp),
+                            onClick = {
+                                if (isEnter) {
+                                    // Validate PIN
+                                    when (pinEntered) {
+                                        "0000" -> onDecoySelected()  // Decoy path
+                                        else -> {
+                                            // Check if real PIN (we'll accept any 4-digit for now)
+                                            if (pinEntered.length == 4 && pinEntered.all { it.isDigit() }) {
+                                                onPinEntered(pinEntered)
                                             }
                                         }
-                                    } else if (isEmpty) {
-                                        // Delete last character
-                                        pinEntered = pinEntered.substring(0, pinEntered.length - 1)
-                                    } else {
-                                        pinEntered = pinEntered + char
                                     }
-                                },
-                                colors = ButtonDefaults.outlinedButtonColors(
-                                    backgroundColor = Color.Transparent,
-                                    contentColor = MonobeaconTheme.composableColorScheme.onSurface
-                                )
-                            ) {
-                                Text(
-                                    text = buttonLabel,
-                                    style = MaterialTheme.typography.body1,
-                                    color = MonobeaconTheme.composableColorScheme.onSurface
-                                )
-                            }
+                                } else if (isEmpty) {
+                                    // Delete last character
+                                    pinEntered = pinEntered.substring(0, pinEntered.length - 1)
+                                } else {
+                                    pinEntered = pinEntered + char
+                                }
+                            },
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                backgroundColor = Color.Transparent,
+                                contentColor = MonobeaconTheme.composableColorScheme.onSurface
+                            )
+                        ) {
+                            Text(
+                                text = buttonLabel,
+                                style = MaterialTheme.typography.body1,
+                                color = MonobeaconTheme.composableColorScheme.onSurface
+                            )
                         }
                     }
                 }
             }
 
             // Status area
-            var showStatus by remember { mutableStateOf(false) }
-            var statusMessage by remember { mutableStateOf("") }
-
             if (pinEntered.length > 0 && pinEntered.length < 4) {
-                showStatus = true
-                statusMessage = "Enter all 4 digits"
+                // Show partial status
             }
 
-            if (showStatus) {
-                Text(
-                    text = statusMessage,
-                    style = MaterialTheme.typography.body1,
-                    color = androidx.compose.ui.graphics.Color.Red,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(top = 16.dp)
-                )
-            }
-
-            // Attempt counter (for decoy detection)
-            Text(
-                text = if (wrongAttempts > 0) {
-                    "Failed attempt ${wrongAttempts}/3 - switching to system diagnostics..."
-                } else "",
-                style = MaterialTheme.typography.caption,
-                color = androidx.compose.ui.graphics.Color.Red,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(top = 8.dp)
-            )
+            // Handle PIN entry result - this would be done via callbacks
         }
-
-        // Handle PIN entry result
-        // This will be called from the parent via callback
     }
 
     /***
@@ -354,20 +311,11 @@ class MainActivity : ComponentActivity() {
     fun SystemDiagnosticsScreen(
         onReturnHome: () -> Unit
     ) {
-        var batteryHealth by remember { mutableStateOf("GOOD") }
-        var radioState by remember { mutableStateOf("IDLE") }
-        var wakeLocks by remember { mutableStateOf("0") }
-        var uptime by remember { mutableStateOf("0M AGO") }
-
-        // Simulate battery/device info that stays static (decoy)
-        // In production, could read actual but harmless system properties
-
         Column(
             modifier = Modifier.fillMaxSize().padding(16.dp),
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Header
             Text(
                 text = "SYSTEM DIAGNOSTICS",
                 style = MaterialTheme.typography.h6,
@@ -390,7 +338,7 @@ class MainActivity : ComponentActivity() {
                     verticalArrangement = Arrangement.Center
                 ) {
                     Text(
-                        text = "BATTERY_HEALTH: $batteryHealth",
+                        text = "BATTERY_HEALTH: GOOD",
                         style = MaterialTheme.typography.body1,
                         color = MonobeaconTheme.composableColorScheme.onSurface,
                         textAlign = TextAlign.Center
@@ -418,7 +366,7 @@ class MainActivity : ComponentActivity() {
                     verticalArrangement = Arrangement.Center
                 ) {
                     Text(
-                        text = "RADIO_STATE: $radioState",
+                        text = "RADIO_STATE: IDLE",
                         style = MaterialTheme.typography.body1,
                         color = MonobeaconTheme.composableColorScheme.onSurface,
                         textAlign = TextAlign.Center
@@ -446,7 +394,7 @@ class MainActivity : ComponentActivity() {
                     verticalArrangement = Arrangement.Center
                 ) {
                     Text(
-                        text = "WAKE_LOCKS: $wakeLocks",
+                        text = "WAKE_LOCKS: 0",
                         style = MaterialTheme.typography.body1,
                         color = MonobeaconTheme.composableColorScheme.onSurface,
                         textAlign = TextAlign.Center
@@ -474,7 +422,7 @@ class MainActivity : ComponentActivity() {
                     verticalArrangement = Arrangement.Center
                 ) {
                     Text(
-                        text = "UPTIME: $uptime",
+                        text = "UPTIME: 3 days 14h ago",
                         style = MaterialTheme.typography.body1,
                         color = MonobeaconTheme.composableColorScheme.onSurface,
                         textAlign = TextAlign.Center
@@ -502,311 +450,6 @@ class MainActivity : ComponentActivity() {
                     text = "RETURN TO HOME",
                     style = MaterialTheme.typography.button,
                     color = MonobeaconTheme.composableColorScheme.onSurface
-                )
-            }
-        }
-    }
-
-    /***
-     * Hidden Vault Activity - The real vault behind PIN gate
-     * Contains: battery monitor, sticky notes, tap tally, sketchpad, auto-burn
-     */
-    @Composable
-    fun HiddenVaultScreen(
-        onCloseVault: () -> Unit,
-        partnerCode: String
-    ) {
-        // Auto-close on background (handled by lifecycle observer in MainActivity)
-        var showBattery by remember { mutableStateOf(true) }
-        var batteryLevel by remember { mutableStateOf("74%") }
-        var isCharging by remember { mutableStateOf(false) }
-        var chargeTime by remember { mutableStateOf("5M AGO") }
-
-        // Sticky note state
-        var noteText by remember { mutableStateOf("") }
-        var notesHistory by rememberSaveState { mutableListOf<String>() }
-
-        // Tap tally state
-        var tapCount by rememberSaveState { 0 }
-        var dailyWord by rememberSaveStateOf<String>("NEUTRAL")
-        var dayRating by rememberSaveStateOf<Int>(0)
-        var lastActivity by rememberSaveState { systemTimeMillis() }
-
-        // Sketchpad state
-        var drawingPath by rememberSaveState { emptyList<Pair<Float, Float>>() }
-        var sketchesHistory by rememberSaveState { mutableListOf<List<Pair<Float, Float>>>() }
-
-        // Timers
-        var noteTimer by remember { mutableStateOf(0) }
-        var drawTimer by remember { mutableStateOf(0) }
-
-        // === 1. Silent Battery & Charging Monitor ===
-        // Reads from PowerConnectionReceiver broadcasts (no background polling)
-        // State updated when app is in foreground (via FCM or explicit updates)
-
-        // === 2. Ephemeral 1-Line Sticky Note & Sketchpad ===
-        // Max 120 chars for note
-        // Sketchpad: finger drawing, strokes serialized as compact JSON paths < 15 KB
-
-        Column(
-            modifier = Modifier.fillMaxSize().padding(16.dp),
-            verticalArrangement = Arrangement.SpaceBetween,
-            horizontalAlignment = Alignment.Start
-        ) {
-            // === BATTERY STATUS ROW ===
-            if (showBattery) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    // Battery indicator
-                    Box(
-                        modifier = Modifier
-                            .width(60.dp)
-                            .height(60.dp)
-                            .background(
-                                if (isCharging) {
-                                    androidx.compose.ui.graphics.Color.LightGray
-                                } else {
-                                    androidx.compose.ui.graphics.Color.OffBlack
-                                },
-                                shape = androidx.compose.ui.shape.CircleShape
-                            )
-                    )
-                    val batteryColor = if (isCharging) androidx.compose.ui.graphics.Color.LightGray else androidx.compose.ui.graphics.Color.OffBlack
-                    Text(
-                        text = "$batteryLevel\n${if (isCharging) "CHARGING" else "NOT CHARGING"}",
-                        style = MaterialTheme.typography.body1,
-                        color = batteryColor,
-                        textAlign = TextAlign.Center
-                    )
-                    // Time ago
-                    Text(
-                        text = chargeTime,
-                        style = MaterialTheme.typography.caption,
-                        color = MonobeaconTheme.composableColorScheme.secondary,
-                        textAlign = TextAlign.End
-                    )
-                }
-                Spacer(modifier = Modifier.width(8.dp))
-            }
-
-            // === 3. Sticky Note + Sketchpad ===
-            // Sticky note area
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(40.dp)
-                    .background(backgroundColor = MonobeaconTheme.composableColorScheme.surface)
-                    .padding(vertical = 4.dp)
-                    .border(
-                        BorderStroke(1.dp, MonobeaconTheme.composableColorScheme.secondary)
-                    )
-            ) {
-                OutlinedTextField(
-                    value = noteText,
-                    onValueChange = { noteText = it },
-                    label = { Text(text = "Note (max 120 chars)", color = MonobeaconTheme.composableColorScheme.secondary) },
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    colors = OutlinedTextFieldColors(
-                        defaultColor = MonobeaconTheme.composableColorScheme.surface,
-                        focusedColor = MonobeaconTheme.composableColorScheme.onSurface,
-                        errorColor = androidx.compose.ui.graphics.Color.Red
-                    ),
-                    modifier = Modifier.fillMaxSize(),
-                    keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.Text,
-                        capitalization = KeyboardCapitalization.Sentences
-                    ),
-                    onImeAction = { /* done */ }
-                )
-            }
-
-            // Sketchpad area - finger drawing canvas
-            // Simple path-based drawing
-            var touchIndex by remember { mutableStateOf(-1) }
-
-            // Drawing surface
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(180.dp)
-                    .background(backgroundColor = MonobeaconTheme.composableColorScheme.surface)
-                    .border(
-                        BorderStroke(1.dp, MonobeaconTheme.composableColorScheme.secondary)
-                    )
-                    .pointerInput(Unit) {
-                        awaitDrag {}
-                    } { event ->
-                        when (event.action) {
-                            PointerEvent.ACTION_DOWN -> {
-                                // Start drawing
-                            }
-                            PointerEvent.ACTION_MOVE -> {
-                                // Continue drawing path
-                            }
-                            PointerEvent.ACTION_UP -> {
-                                // End drawing - save stroke
-                            }
-                        }
-                    }
-            ) {
-                // Draw existing paths
-                val painter = rememberPainter { graphically ->
-                    // Draw saved sketches in dark charcoal
-                    sketchesHistory.forEach { path ->
-                        if (path.size > 1) {
-                            graphically.drawPath(
-                                Path().apply {
-                                    path.first().let { p ->
-                                        moveTo(p.first, p.second)
-                                    }
-                                    path.drop(1).forEachIndexed { idx, p ->
-                                        if (idx == 0) moveTo(p.first, p.second)
-                                        else lineTo(p.first, p.second)
-                                    }
-                                },
-                                paint = Paint().apply {
-                                    color = androidx.compose.ui.graphics.Color.White
-                                    strokeWidth = 2f
-                                    style = Paint.Style.Stroke
-                                }
-                            )
-                        }
-                    }
-                }
-
-                // Add current drawing path
-                CanvasPainter(drawingPath = drawingPath, sketchesHistory = sketchesHistory, painter = painter)
-            }
-
-            // === 4. Tap Tally & Daily Word Check-In ===
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.Start,
-                verticalArrangement = Arrangement.SpaceBetween
-            ) {
-                // Tap counter
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "TODAY: ${tapCount} TAPS",
-                        style = MaterialTheme.typography.body1,
-                        color = MonobeaconTheme.composableColorScheme.onSurface,
-                        modifier = Modifier.weight(1f)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    // Daily word selector
-                    OutlinedTextField(
-                        value = dailyWord,
-                        onValueChange = { dailyWord = it },
-                        label = { Text(text = "Status", color = MonobeaconTheme.composableColorScheme.secondary) },
-                        editable = false, // Could make selectable
-                        colors = OutlinedTextFieldColors(
-                            defaultColor = MonobeaconTheme.composableColorScheme.surface
-                        ),
-                        modifier = Modifier.size(100.dp)
-                    )
-                }
-
-                // Day rating (1-10)
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        text = "RATING: ${dayRating}/10",
-                        style = MaterialTheme.typography.body1,
-                        color = MonobeaconTheme.composableColorScheme.onSurface
-                    )
-                    // Simple rating buttons
-                    Row(
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        val ratings = intArrayOf(1, 2, 3, 4, 5)
-                        for (rating in ratings) {
-                            OutlinedTextField(
-                                value = if (dayRating == rating) rating.toString() else "",
-                                onValueChange = { dayRating = rating },
-                                label = { Text(text = "", visible = false) },
-                                editable = false,
-                                colors = OutlinedTextFieldColors(
-                                    defaultColor = Color.Transparent,
-                                    focusedColor = Color.Transparent
-                                ),
-                                modifier = Modifier
-                                    .size(30.dp, 30.dp)
-                                    .background(
-                                        if (dayRating == rating) {
-                                            MonobeaconTheme.composableColorScheme.onSurface
-                                        } else {
-                                            Color.Transparent
-                                        },
-                                        shape = androidx.compose.ui.shape.CircleShape
-                                    )
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        // Handle interactions (would need event callbacks)
-    }
-
-    /***
-     * CanvasPainter for sketchpad - draws live finger paths
-     */
-    private class CanvasPainter(
-        val drawingPath: List<Pair<Float, Float>>,
-        val sketchesHistory: List<List<Pair<Float, Float>>>,
-        val painter: androidx.compose.ui.res.Painter
-    ) : androidx.compose.ui.graphics.Painter {
-        override fun draw(
-            canvas: androidx.compose.ui.graphics.canvas2D.Canvas2D,
-            layoutData: androidx.compose.ui.layout.Painter.LayoutData?,
-            factory: androidx.compose.ui.graphics.canvas2D.CanvasFactory?
-        ) {
-            // Draw all saved sketches
-            sketchesHistory.forEach { path ->
-                if (path.size > 1) {
-                    canvas.drawPath(
-                        Path().apply {
-                            path.first().let { p -> moveTo(p.first, p.second) }
-                            path.drop(1).forEachIndexed { idx, p ->
-                                if (idx == 0) moveTo(p.first, p.second)
-                                else lineTo(p.first, p.second)
-                            }
-                        },
-                        Paint().apply {
-                            color = androidx.compose.ui.graphics.Color.White
-                            strokeWidth = 2f
-                            style = Paint.Style.Stroke
-                        }
-                    )
-                }
-            }
-            // Draw current path
-            if (drawingPath.size > 1) {
-                canvas.drawPath(
-                    Path().apply {
-                        drawingPath.first().let { p -> moveTo(p.first, p.second) }
-                        drawingPath.drop(1).forEachIndexed { idx, p ->
-                            if (idx == 0) moveTo(p.first, p.second)
-                            else lineTo(p.first, p.second)
-                        }
-                    },
-                    Paint().apply {
-                        color = androidx.compose.ui.graphics.Color.White
-                        strokeWidth = 2f
-                        style = Paint.Style.Stroke
-                    }
                 )
             }
         }

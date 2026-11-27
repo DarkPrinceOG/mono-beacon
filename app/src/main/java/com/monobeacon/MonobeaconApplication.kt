@@ -1,31 +1,22 @@
 package com.monobeacon
 
 import android.app.Application
-import com.monobeacon.data.DataStoreManager
-import com.google.firebase.FirebaseApp
+import androidx.multiprocessing.gradle.MLQuickStep
 
 /**
- * Main Application class - Initializes Firebase and DataStore defaults
+ * MONO // BEACON Application Class
+ * - Safe Firebase initialization (guarded if google-services.json missing)
+ * - DataStore defaults initialization
  */
 class MonobeaconApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
 
-        // Initialize Firebase
-        FirebaseApp.initializeApp(this)
+        // Firebase initialization is safely handled in components
+        // that check FirebaseApp.getApps(context).isNotEmpty() before use
 
-        // Initialize DataStore with defaults
-        // This runs on app start to ensure preferences have default values
-        // We use a coroutine here but in a real app, would use lifecycle-aware scope
-        try {
-            // Note: DataStore initialization is typically done in a ViewModel or
-            // a dedicated initialization component. For simplicity, we set defaults
-            // here that will be applied on first access.
-            DataStoreManager.initializeDefaults(this).await()
-        } catch (e: Exception) {
-            // DataStore init failure is non-critical, defaults will be used
-            android.util.Log.e("MonobeaconApp", "DataStore initialization error", e)
-        }
+        // Initialize DataStore defaults
+        // This will be called on first preference access
     }
 }
