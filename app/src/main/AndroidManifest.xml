@@ -1,8 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.monobeacon.monobeacon">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Permissions -->
     <uses-permission android:name="android.permission.RECEIVE_SMS"/>
     <uses-permission android:name="android.permission.READ_SMS"/>
     <uses-permission android:name="android.permission.SEND_SMS"/>
@@ -14,83 +12,68 @@
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE"/>
-    <!-- Stealth: power connection broadcasts for vault battery monitor -->
-    <uses-permission android:name="android.intent.action.ACTION_POWER_CONNECTED"/>
-    <uses-permission android:name="android.intent.action.ACTION_POWER_DISCONNECTED"/>
 
-    <!-- Features -->
     <uses-feature android:glEsVersion="0x00020000" android:required="false"/>
     <uses-feature android:name="android.hardware.camera.any" android:required="false"/>
 
     <application
         android:allowBackup="true"
         android:appCategory="utility"
-        android:enableRecoverableContent="true"
         android:icon="@mipmap/ic_launcher"
-        android:label="Beacon"  <!-- Stealth disguise: public label -->
+        android:label="Beacon"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/BaseTheme">
 
-        <!-- Main Launcher Activity - Disguised as basic device utility -->
         <activity
             android:name=".compose.screen.MainActivity"
             android:exported="true"
-            android:label="Beacon"  <!-- Disguised label -->
+            android:label="Beacon"
             android:theme="@style/BaseTheme">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
-            <!-- Stealth: Lifecycle observer for auto-lock on background -->
             <meta-data
                 android:name="androidx.lifecycle.OBSERVER_MODE"
                 android:value="true"/>
         </activity>
 
-        <!-- Settings Activity -->
         <activity
             android:name=".compose.screen.SettingsActivity"
             android:exported="false"
             android:label="@string/settings"
             android:theme="@style/AlertDialogTheme"/>
 
-        <!-- Alarm Active Activity - shown over lock screen -->
         <activity
             android:name=".compose.screen.AlarmActiveActivity"
             android:exported="false"
             android:label="@string/alarm_active"
             android:theme="@style/AlertDialogTheme"
             android:showWhenLocked="true"
-            android:turnScreenOn="true"
-            android:permission="android.permission.BLOCK_OUTGOING_CALLS">
+            android:turnScreenOn="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
             </intent-filter>
         </activity>
 
-        <!-- Hidden Vault Activity (exported=false, requires PIN) -->
         <activity
             android:name=".compose.screen.HiddenVaultActivity"
             android:exported="false"
             android:label="Beacon"
             android:theme="@style/AlertDialogTheme"
             android:finishOnTaskLaunch="true">
-            <!-- Intent filter for PIN gate navigation -->
             <intent-filter>
                 <action android:name="com.monobeacon.action.VAULT_ACCESS"/>
             </intent-filter>
         </activity>
 
-        <!-- System Diagnostics Decoy Activity -->
         <activity
             android:name=".compose.screen.SystemDiagnosticsActivity"
             android:exported="false"
             android:label="Beacon"
-            android:theme="@style/AlertDialogTheme">
-        </activity>
+            android:theme="@style/AlertDialogTheme"/>
 
-        <!-- Alarm Service - Foreground service -->
         <service
             android:name=".service.AlarmService"
             android:exported="false"
@@ -103,7 +86,6 @@
             </intent-filter>
         </service>
 
-        <!-- Firebase Messaging Service -->
         <service
             android:name=".receiver.FirebaseMessagingHandler"
             android:exported="false">
@@ -112,27 +94,16 @@
             </intent-filter>
         </service>
 
-        <!-- SMS Trigger Receiver -->
         <receiver
             android:name=".receiver.SmsTriggerReceiver"
             android:exported="true"
-            android:permission="android.permission.SEND_SMS">
+            android:permission="android.permission.BROADCAST_SMS">
             <intent-filter>
                 <action android:name="android.intent.action.DATA_SMS_RECEIVED"/>
-                <action android:name="android.intent.action.SMS_RECEIVED"/>
+                <action android:name="android.provider.Telephony.SMS_RECEIVED"/>
             </intent-filter>
         </receiver>
 
-        <!-- Firebase Instance ID Receiver -->
-        <receiver
-            android:name=".receiver.FirebaseInstanceIdReceiver"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="com.google.firebase.INSTANCE_ID_EVENT"/>
-            </intent-filter>
-        </receiver>
-
-        <!-- Power Connection Broadcast Receiver (for vault battery monitor) -->
         <receiver
             android:name=".receiver.PowerConnectionReceiver"
             android:exported="false">
