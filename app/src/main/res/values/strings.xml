@@ -30,4 +30,4 @@
     <string name="autostart_settings">Autostart Settings</string>
     <string name="battery_saver">Battery Saver</string>
     <string name="sms_trigger_received">SMS Trigger Received</string>
-</STRINGSEOF
+</resources>
