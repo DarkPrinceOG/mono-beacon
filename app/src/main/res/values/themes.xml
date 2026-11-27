@@ -1,44 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Base Application Theme - Strict Monochrome B&W -->
-    <style name="BaseTheme" parent="Theme.Material3.Dark.NoActionBar">
-        <!-- Color palette forced to monochrome -->
-        <item name="colorPrimary">@color/amodal_black</item>
-        <item name="colorOnPrimary">@color/pure_white</item>
-        <item name="colorSecondary">@color/off_black</item>
-        <item name="colorOnSecondary">@color/pure_white</item>
-        <item name="colorSurface">@color/off_black</item>
-        <item name="colorOnSurface">@color/pure_white</item>
-        <item name="colorBackground">@color/amodal_black</item>
-        <item name="colorOnBackground">@color/pure_white</item>
-        <item name="colorError">@color/pure_white</item>
-        <item name="colorOnError">@color/amodal_black</item>
-
-        <!-- Status bar color -->
+    <style name="BaseTheme" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/amodal_black</item>
+        <item name="android:colorBackground">@color/amodal_black</item>
         <item name="android:statusBarColor">@color/amodal_black</item>
         <item name="android:navigationBarColor">@color/amodal_black</item>
-
-        <!-- App bar style -->
-        <item name="materialActionBarTabStyle">@style/CustomTabStyle</item>
     </style>
 
-    <style name="CustomTabStyle" parent="Widget.Material3.TabView">
-        <item name="android:background">@color/amodal_black</item>
-        <item name="android:textColor">@color/light_gray</item>
-        <item name="android:selectedTextColor">@color/pure_white</item>
-    </style>
-
-    <!-- Alert Dialog Theme -->
-    <style name="AlertDialogTheme" parent="Theme.Material3.Dialog">
-        <item name="android:background">@color/off_black</item>
+    <style name="AlertDialogTheme" parent="@android:style/Theme.Material.Dialog">
+        <item name="android:windowBackground">@color/off_black</item>
         <item name="android:colorBackground">@color/off_black</item>
-    </style>
-
-    <!-- Text Input Layout -->
-    <style name="Widget.TextInputLayout" parent="Widget.Material3.TextInputLayout">
-        <item name="android:textColorHint">@color/light_gray</item>
-        <item name="hintTextColor">@color/light_gray</item>
-        <item name="android:colorControlNormal">@color/hairline_border</item>
-        <item name="android:colorControlActivated">@color/pure_white</item>
     </style>
 </resources>
